@@ -11705,8 +11705,15 @@ function World:stepBody()
     if self:takePendingWarp() then return end
   end
   if self.emote then
-    self.emote.left = self.emote.left - 1
-    if self.emote.left <= 0 then self.emote = nil end
+    -- showEmote seeds `left`; a mod's own bubble may arrive as
+    -- { frames, onDone } instead, so count down from frames and hand the
+    -- callback back when it expires rather than doing arithmetic on nil.
+    local e = self.emote
+    e.left = (tonumber(e.left) or tonumber(e.frames) or 0) - 1
+    if e.left <= 0 then
+      self.emote = nil
+      if type(e.onDone) == "function" then pcall(e.onDone) end
+    end
   end
   -- The heal machine runs while the script is parked on its specialwait, so
   -- it ticks here above the input gate the same way the emote does; its
