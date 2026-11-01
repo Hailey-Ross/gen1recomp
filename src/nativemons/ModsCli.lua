@@ -1,6 +1,7 @@
 -- nativeMons: lets the launcher list and switch mods without opening a game window.
 --   NATIVEMONS_CLI="paths"                      love .
 --   NATIVEMONS_CLI="games"                      love .
+--   NATIVEMONS_CLI="active <version>" | "activate <version> <slot>" | "delete <version> <slot>"   save slots
 --   NATIVEMONS_CLI="options"                    love .   the settings the launcher shows
 --   NATIVEMONS_CLI="option <key> <value>"       love .
 --   NATIVEMONS_CLI="export <version>"           love .   prints the exported .sav's path
@@ -91,6 +92,16 @@ function ModsCli.run(command)
     return 2
   end
 
+  if verb == "active" then
+    print(tostring(SaveData.activeSlot(version)))
+    return 0
+  end
+  if verb == "activate" then
+    return SaveData.setActiveSlot(version, id) and 0 or 1
+  end
+  if verb == "delete" then
+    return SaveData.deleteSlot(version, id) and 0 or 1
+  end
   if verb == "export" or verb == "import" then
     -- Cartridge saves, for moving Pokemon. Importing makes a new active slot, so older slots stay.
     GameVersion.set(version)
