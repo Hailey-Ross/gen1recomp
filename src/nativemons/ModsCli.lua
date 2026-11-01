@@ -1,6 +1,8 @@
 -- nativeMons: lets the launcher list and switch mods without opening a game window.
 --   NATIVEMONS_CLI="paths"                      love .
 --   NATIVEMONS_CLI="games"                      love .
+--   NATIVEMONS_CLI="options"                    love .   the settings the launcher shows
+--   NATIVEMONS_CLI="option <key> <value>"       love .
 --   NATIVEMONS_CLI="export <version>"           love .   prints the exported .sav's path
 --   NATIVEMONS_CLI="import <version> <file>"    love .
 --   NATIVEMONS_CLI="list <version>"             love .
@@ -47,6 +49,31 @@ function ModsCli.run(command)
     print("mods\t" .. love.filesystem.getSaveDirectory() .. "/mods")
     return 0
   end
+  -- Settings the launcher shows, stored where the game's own options menu keeps them.
+  local OPTIONS = { textSpeed = "number", musicVol = "number", sfxVol = "number",
+    videoMode = "string", battleLayout = "string", animations = "boolean" }
+  if verb == "options" then
+    local options = SaveData.loadOptions()
+    for key in pairs(OPTIONS) do print(key .. "\t" .. tostring(options[key])) end
+    return 0
+  end
+  if verb == "option" then
+    -- Here the words after the verb are a key and a value.
+    local key, raw = version, id
+    local kind = OPTIONS[key]
+    local value
+    if kind == "number" then value = tonumber(raw)
+    elseif kind == "boolean" then value = raw == "true"
+    elseif kind == "string" and raw ~= "" then value = raw end
+    if value == nil then
+      io.stderr:write("unknown setting or value\n")
+      return 2
+    end
+    local options = SaveData.loadOptions()
+    options[key] = value
+    return SaveData.saveOptions(options) == false and 1 or 0
+  end
+
   if verb == "games" then
     -- One row per game: version, generation, imported yes/no, accepted ROM SHA-1s.
     local RomImporter = require("src.nativemons.RomImporter")
