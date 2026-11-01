@@ -1,5 +1,8 @@
 # G1R Deluxe aka Gen1Recomp
 
+> **nativeMons fork.** Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC (https://github.com/bryanthaboi/gen1recomp). See [what this fork changes](docs/hails-additions/README.md).
+
+
 A native LÖVE2D recreation of Poke Red, Blue, Yellow, Gold, Silver, Crystal, FireRed, LeafGreen, Ruby, Sapphire, and Emerald.
 The engine and map behavior are hand-written Lua; game data and graphics are 
 decoded from a ROM supplied by the player.

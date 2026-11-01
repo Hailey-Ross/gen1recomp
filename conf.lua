@@ -155,4 +155,5 @@ function love.conf(t)
       t.window.y = -30000
     end
   end
+  if os.getenv("NATIVEMONS_CLI") then t.window = nil end
 end

@@ -15,6 +15,7 @@ if os.getenv("POKEPORT_JIT") == "0" and jit and jit.off then
   print("[info] jit off")
 end
 
+require("src.nativemons")
 local SwitchDiagnostics = require("src.debug.SwitchDiagnostics")
 
 -- Global emergency quit: holding Start + Select for 5 seconds forcefully terminates LOVE.
