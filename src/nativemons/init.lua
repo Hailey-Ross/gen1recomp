@@ -18,8 +18,17 @@ preload("src.import.LauncherSplash", "src.nativemons.NoSplash")
 -- Leaving a game ends the process, which returns the player to the nativeMons launcher.
 require("src.core.HostShell").canRestart = function() return false end
 
+local gameOptions = require("src.nativemons.GameOptions")
+local installed, problem = pcall(gameOptions.install)
+if not installed then io.stderr:write("game options: " .. tostring(problem) .. "\n") end
+
 -- A launcher request with no game to start: answer it and end here.
 local command = os.getenv("NATIVEMONS_CLI")
+if command == "gameoptions" then
+  io.stdout:write(gameOptions.report() .. "\n")
+  io.stdout:flush()
+  os.exit(0)
+end
 if command then
   local ok, code = pcall(function() return require("src.nativemons.ModsCli").run(command) end)
   if not ok then io.stderr:write(tostring(code) .. "\n") end
