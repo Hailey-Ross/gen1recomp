@@ -1,6 +1,8 @@
 -- nativeMons: lets the launcher list and switch mods without opening a game window.
 --   NATIVEMONS_CLI="paths"                      love .
 --   NATIVEMONS_CLI="games"                      love .
+--   NATIVEMONS_CLI="export <version>"           love .   prints the exported .sav's path
+--   NATIVEMONS_CLI="import <version> <file>"    love .
 --   NATIVEMONS_CLI="list <version>"             love .
 --   NATIVEMONS_CLI="set <version> <id> on|off"  love .
 --
@@ -60,6 +62,22 @@ function ModsCli.run(command)
   if not GameVersion.VERSIONS[version] then
     io.stderr:write("unknown game: " .. tostring(version) .. "\n")
     return 2
+  end
+
+  if verb == "export" or verb == "import" then
+    -- Cartridge saves, for moving Pokemon. Importing makes a new active slot, so older slots stay.
+    GameVersion.set(version)
+    require("src.import.CacheFs").mountVersion(version)
+    local IO = require("src.import.SaveFileIO")
+    local ok, res, info
+    if verb == "export" then ok, res, info = IO.exportActiveSlot(version)
+    else ok, res, info = IO.importToSlot(command:match("^%S+%s+%S+%s+(.+)$"), version, false) end
+    if not ok then
+      io.stderr:write(tostring(res or (info and info.note) or "save conversion failed") .. "\n")
+      return 2
+    end
+    print(tostring(res))
+    return 0
   end
 
   local ModTargets = require("src.mods.ModTargets")
