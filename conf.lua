@@ -156,4 +156,5 @@ function love.conf(t)
     end
   end
   if os.getenv("NATIVEMONS_CLI") then t.window = nil end
+  if os.getenv("NATIVEMONS_TITLE_ART") then t.window.borderless, t.window.x, t.window.y = true, -30000, -30000 end
 end
