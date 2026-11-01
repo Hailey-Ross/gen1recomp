@@ -1,7 +1,7 @@
 -- nativeMons: lets the launcher list and switch mods without opening a game window.
 --   NATIVEMONS_CLI="paths"                      love .
 --   NATIVEMONS_CLI="games"                      love .
---   NATIVEMONS_CLI="active <version>" | "activate <version> <slot>" | "delete <version> <slot>"   save slots
+--   NATIVEMONS_CLI="active <version>" | "activate <version> <slot>" | "delete <version> <slot>" | "new <version>" | "duplicate <version> <slot>" | "adopt <version> <file>"   save slots
 --   NATIVEMONS_CLI="options"                    love .   the settings the launcher shows
 --   NATIVEMONS_CLI="option <key> <value>"       love .
 --   NATIVEMONS_CLI="export <version>"           love .   prints the exported .sav's path
@@ -101,6 +101,53 @@ function ModsCli.run(command)
   end
   if verb == "delete" then
     return SaveData.deleteSlot(version, id) and 0 or 1
+  end
+  if verb == "new" then
+    -- A new empty slot in use, so the title screen offers NEW GAME. Other slots stay.
+    local slot = SaveData.createSlot(version)
+    if not slot or not SaveData.setActiveSlot(version, slot) then return 1 end
+    print(slot)
+    return 0
+  end
+  if verb == "duplicate" then
+    -- A copy of a slot, which leaves the slot in use as it is.
+    local slot, err = SaveData.duplicateSlot(version, id)
+    if not slot then
+      io.stderr:write(tostring(err or "could not copy the slot") .. "\n")
+      return 1
+    end
+    print(slot)
+    return 0
+  end
+  if verb == "adopt" then
+    -- A slot file from another install of this game. It's data, so it runs with access to nothing,
+    -- and it must be this game's. The new slot is read back before it goes in use. Other slots stay.
+    local path = command:match("^%S+%s+%S+%s+(.+)$")
+    local file = path and io.open(path, "rb")
+    if not file then io.stderr:write("can't read that file\n") return 2 end
+    local text = file:read("*a")
+    file:close()
+    local chunk = loadstring(text, "=save")
+    if not chunk then io.stderr:write("that isn't a save slot\n") return 2 end
+    setfenv(chunk, {})
+    local ok, save = pcall(chunk)
+    if not ok or type(save) ~= "table" or type(save.player) ~= "table" then
+      io.stderr:write("that isn't a save slot\n")
+      return 2
+    end
+    if save.version ~= version then
+      io.stderr:write("that save is for " .. tostring(save.version) .. ", not " .. version .. "\n")
+      return 2
+    end
+    local slot = SaveData.createSlot(version)
+    if not slot or not SaveData.writeSlot(version, slot, save) or not SaveData.readSlotSource(version, slot) then
+      if slot then SaveData.deleteSlot(version, slot) end
+      io.stderr:write("the save couldn't be written and read back\n")
+      return 1
+    end
+    if not SaveData.setActiveSlot(version, slot) then return 1 end
+    print(slot)
+    return 0
   end
   if verb == "export" or verb == "import" then
     -- Cartridge saves, for moving Pokemon. Importing makes a new active slot, so older slots stay.
