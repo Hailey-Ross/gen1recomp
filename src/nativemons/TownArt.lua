@@ -11,7 +11,7 @@ local TOWNS = {
   red = { "PALLET_TOWN", 10, 9 }, blue = { "PALLET_TOWN", 10, 9 }, yellow = { "PALLET_TOWN", 10, 9 },
   gold = { "NEW_BARK_TOWN", 10, 9 }, silver = { "NEW_BARK_TOWN", 10, 9 }, crystal = { "NEW_BARK_TOWN", 10, 9 },
   firered = { "FR_PALLET_TOWN", 12, 10 }, leafgreen = { "FR_PALLET_TOWN", 12, 10 },
-  ruby = { "RU_LITTLEROOT_TOWN", 10, 10 }, sapphire = { "RU_LITTLEROOT_TOWN", 10, 10 }, emerald = { "EM_LITTLEROOT_TOWN", 10, 10 },
+  ruby = { "MAP_LITTLEROOT_TOWN", 10, 10 }, sapphire = { "MAP_LITTLEROOT_TOWN", 10, 10 }, emerald = { "EM_LITTLEROOT_TOWN", 10, 10 },
 }
 
 -- Pixels per world pixel for the picture: the engines' survey zoom, with the town filling the view.
@@ -58,7 +58,7 @@ local function gen3(game, town)
   end
   if not game.boot then fail("the game didn't reach its title") end
   game:_handleBootAction({ action = "new_game", name = "RED", gender = 0 })
-  wait(180)
+  wait(240)
   -- Past the moving-in scene, so the town is as a player knows it.
   pcall(function()
     local Flags, Space = require("src.core.game3.scripting.flags"), require("src.core.game3.scripting.space")
@@ -66,7 +66,10 @@ local function gen3(game, town)
     Flags.setVar(Space.store, nil, VARS.VAR_LITTLEROOT_TOWN_STATE, 4)
     Flags.setVar(Space.store, nil, VARS.VAR_LITTLEROOT_INTRO_STATE, 7)
   end)
-  require("src.core.game3.map").load(nil, game, town[1], { x = town[2], y = town[3], facing = "down" })
+  -- Ruby and Sapphire name their maps through the game's own table, as their versions differ.
+  local mapId = town[1]
+  if mapId:sub(1, 4) == "MAP_" then mapId = require("src.core.game3.map_ids").forConst(mapId) end
+  require("src.core.game3.map").load(nil, game, mapId, { x = town[2], y = town[3], facing = "down" })
 end
 
 return function(game)
