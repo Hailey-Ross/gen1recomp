@@ -19,13 +19,29 @@ local function wrap(module, name, apply)
   end
 end
 
+-- Their volumes run 0 to 7. The overall volume scales music and effects, as they have no overall setting of their own.
+local function volume(o, w)
+  local function level(part)
+    local overall, own = tonumber(w.vol), tonumber(part)
+    if not overall and not own then return nil end
+    return math.floor(7 * (overall or 100) * (own or 100) / 10000 + 0.5)
+  end
+  local music, sfx = level(w.music), level(w.sfx)
+  if music then o.musicVol = music end
+  if sfx then o.sfxVol = sfx end
+  if w.full then o.videoMode = w.full == "on" and "borderless" or "windowed" end
+  if w.wide then o.battleLayout = w.wide == "on" and "wide" or "og" end
+end
+
 local function gen1(o, w)
+  volume(o, w)
   if w.text then o.textSpeed = ({ slow = 5, mid = 3, fast = 1 })[w.text] end
   if w.scene then o.animations = w.scene == "on" end
   if w.style then o.battleStyle = w.style end
 end
 
 local function gen2(o, w)
+  volume(o, w)
   if w.text then o.textSpeed = ({ slow = "SLOW", mid = "MID", fast = "FAST" })[w.text] end
   if w.scene then o.battleScene = w.scene == "on" end
   if w.style then o.battleStyle = w.style:upper() end
@@ -70,6 +86,7 @@ function GameOptions.report()
   return "gen1 " .. row(a.textSpeed, a.animations, a.battleStyle)
     .. " | gen2 " .. row(b.textSpeed, b.battleScene, b.battleStyle, b.sound)
     .. " | gen3 " .. row(c.textSpeed, c.battleScene, c.battleStyle, c.sound, c.buttonMode, c.frameType)
+    .. " | engine " .. row(a.musicVol, a.sfxVol, a.videoMode, a.battleLayout) .. " gen2 " .. row(b.musicVol, b.sfxVol, b.videoMode, b.battleLayout)
 end
 
 return GameOptions
