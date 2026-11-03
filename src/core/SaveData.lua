@@ -343,6 +343,7 @@ SaveData.openNative = nativeOpen
 SaveData.removeNative = nativeRemove
 SaveData.statNative = nativeStat
 SaveData.mkdirNative = nativeMkdirp
+SaveData.listNative = nativeList -- nativeMons: RomImporter's purge looks at LOVE's own save folder only
 SaveData.listNative = nativeList
 
 -- an io.* filesystem exposing the love.filesystem subset the save/options
@@ -490,6 +491,23 @@ local function detectPortable()
   portableBase = false
   -- Flatpak: never honor portable.txt (sandbox home is the persistence root).
   if type(os.getenv) == "function" and os.getenv("FLATPAK_ID") then
+    return portableBase
+  end
+  -- nativeMons: the launcher names the portable folder (beside itself), so
+  -- the player's data travels with the launcher and not inside the engine,
+  -- which its updates replace. No marker file is needed for it.
+  local named = type(os.getenv) == "function" and os.getenv("NATIVEMONS_DATA_DIR")
+  if named and named ~= "" then
+    named = named:gsub("[/\\]+$", "")
+    pcall(nativeMkdirp, named)
+    local writable = dirIsWritable(named)
+    portableTried = { { path = named, marker = true, writable = writable,
+      reason = (not writable) and "folder not writable" or nil } }
+    if writable then
+      portableBase = named
+    else
+      require("src.core.Logger").warn("NATIVEMONS_DATA_DIR rejected %s: folder not writable", named)
+    end
     return portableBase
   end
   portableTried = {}

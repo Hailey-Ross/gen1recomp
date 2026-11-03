@@ -15,6 +15,16 @@ preload("src.import.RomImporter", "src.nativemons.RomImporter")
 preload("src.mods.LauncherMods", "src.nativemons.ModsShim")
 preload("src.import.LauncherSplash", "src.nativemons.NoSplash")
 
+-- The launcher keeps the player's data in a folder of its own (NATIVEMONS_DATA_DIR, portable mode in SaveData). Mounted
+-- now, ahead of LOVE's save folder, so what's read through love.filesystem (mods, the ROM cache) is found there from
+-- the start, before the mod loader looks.
+if os.getenv("NATIVEMONS_DATA_DIR") then
+  local ok, root = pcall(function() return require("src.import.CacheFs").root() end)
+  if not ok or not root then
+    io.stderr:write("data folder: " .. tostring(ok and require("src.import.CacheFs").portableError() or root) .. "\n")
+  end
+end
+
 -- Leaving a game ends the process, which returns the player to the nativeMons launcher.
 require("src.core.HostShell").canRestart = function() return false end
 

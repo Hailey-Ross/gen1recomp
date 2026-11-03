@@ -28,18 +28,22 @@ local function sha1(data)
   return love.data.encode("string", "hex", digest)
 end
 
+-- Only what is really in LOVE's save folder: love.filesystem also sees the portable folder mounted over it (with
+-- NATIVEMONS_DATA_DIR), and that one is the cache in use.
+local function saveDirPath(path) return love.filesystem.getSaveDirectory() .. "/" .. path end
+
 local function removeTree(path)
-  local info = love.filesystem.getInfo(path)
+  local SaveData = require("src.core.SaveData")
+  local real = saveDirPath(path)
+  local info = SaveData.statNative(real)
   if not info then return end
   if info.type == "directory" then
-    for _, child in ipairs(love.filesystem.getDirectoryItems(path)) do
+    for _, child in ipairs(SaveData.listNative(real) or {}) do
       removeTree(path .. "/" .. child)
     end
     love.filesystem.remove(path)
     return
   end
-  local SaveData = require("src.core.SaveData")
-  local real = love.filesystem.getSaveDirectory() .. "/" .. path
   local ok, err = SaveData.removeNative(real)
   if not ok then error("could not remove stale cache " .. real .. ": " .. tostring(err)) end
 end
@@ -51,7 +55,7 @@ local function purgeSaveDirCache()
   saveDirPurged = true
   for _, version in ipairs(GameVersion.ORDER) do
     local prefix = GameVersion.cachePrefix(version)
-    if love.filesystem.getInfo(prefix .. CacheContract.MARKER_PATH) then
+    if require("src.core.SaveData").statNative(saveDirPath(prefix .. CacheContract.MARKER_PATH)) then
       removeTree(prefix .. "data/generated")
       removeTree(prefix .. "assets/generated")
       love.filesystem.remove(prefix .. CacheContract.MARKER_PATH)

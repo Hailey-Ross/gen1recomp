@@ -46,8 +46,10 @@ function ModsCli.run(command)
   local GameVersion = require("src.core.GameVersion")
 
   if verb == "paths" then
-    print("save\t" .. love.filesystem.getSaveDirectory())
-    print("mods\t" .. love.filesystem.getSaveDirectory() .. "/mods")
+    -- The portable folder when there is one (NATIVEMONS_DATA_DIR), else LOVE's.
+    local root = SaveData.portableBaseDir() or love.filesystem.getSaveDirectory()
+    print("save\t" .. root)
+    print("mods\t" .. root .. "/mods")
     return 0
   end
   -- Settings the launcher shows, stored where the game's own options menu keeps them.
