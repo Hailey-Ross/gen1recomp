@@ -157,11 +157,9 @@ function RomImporter:_completeImport(version, prefix, displayName)
   if GameVersion.generation(version) == 2 and SaveConvert then
     SaveConvert.invalidateGen2Data(version)
   end
-  local RomSources = require("src.import.RomSources")
-  local source = self._importSource
-  if RomSources.isAbsolute(source) then
-    pcall(RomSources.remember, version, { sha1 = self.romSha1, at = os.time(), path = source })
-  end
+  -- Upstream records the ROM's path in options.lua here, for its own launcher to find it again. Nothing in nativeMons
+  -- reads that record (the launcher passes the ROM every time), and skipping it means imports never write the player's
+  -- options file, so the launcher can prepare several games at once.
   report("100 Ready")
   if self.onComplete then self.onComplete(version) end
 end

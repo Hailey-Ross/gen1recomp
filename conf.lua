@@ -156,5 +156,14 @@ function love.conf(t)
     end
   end
   if os.getenv("NATIVEMONS_CLI") then t.window = nil end
-  if os.getenv("NATIVEMONS_TITLE_ART") then t.window.borderless, t.window.x, t.window.y = true, -30000, -30000 end
+  -- Background jobs for the nativeMons launcher: their window opens off-screen without taking the focus, and
+  -- src/nativemons hides it as soon as it exists, so the player never sees it.
+  if t.window and (os.getenv("NATIVEMONS_TITLE_ART") or os.getenv("NATIVEMONS_TOWN_ART") or os.getenv("POKEPORT_IMPORT_ONLY") == "1") then
+    t.window.borderless, t.window.resizable, t.window.x, t.window.y = true, false, -30000, -30000
+    pcall(function()
+      local ffi = require("ffi")
+      ffi.cdef("int SDL_SetHint(const char *name, const char *value);")
+      ffi.load("SDL2").SDL_SetHint("SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN", "1")
+    end)
+  end
 end
