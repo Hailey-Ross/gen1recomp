@@ -166,4 +166,15 @@ function love.conf(t)
       ffi.load("SDL2").SDL_SetHint("SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN", "1")
     end)
   end
+  -- A game the launcher keeps ready (src/nativemons/QuickStart.lua) also opens off-screen and quietly; on Play it goes
+  -- where it would have opened.
+  if t.window and os.getenv("NATIVEMONS_QUICK_START") == "1" then
+    NATIVEMONS_WINDOW = { x = t.window.x, y = t.window.y, display = t.window.display }
+    t.window.x, t.window.y = -30000, -30000
+    pcall(function()
+      local ffi = require("ffi")
+      pcall(ffi.cdef, "int SDL_SetHint(const char *name, const char *value);")
+      ffi.load("SDL2").SDL_SetHint("SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN", "1")
+    end)
+  end
 end

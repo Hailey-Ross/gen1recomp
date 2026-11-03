@@ -1819,6 +1819,7 @@ do
     return a, b
   end
 end
+require("src.nativemons.QuickStart").install(function() return Game end) -- nativeMons
 
 function love.run()
   _G.POKEPORT_LOOP_RESTART = true
