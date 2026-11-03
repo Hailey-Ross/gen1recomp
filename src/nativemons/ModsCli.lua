@@ -30,6 +30,9 @@ local function readManifests()
       local data = Json.decode(raw)
       local ok, manifest = pcall(Manifest.validate, data, root)
       if data and ok then
+        -- Shipped with the engine (in its own folder), not installed by the player.
+        local okDir, dir = pcall(love.filesystem.getRealDirectory, root .. "/manifest.json")
+        manifest.bundled = okDir and dir ~= nil and dir == love.filesystem.getSource()
         found[#found + 1] = manifest
       else
         io.stderr:write("mod ignored: " .. root .. "\n")
@@ -45,6 +48,50 @@ function ModsCli.run(command)
   local SaveData = require("src.core.SaveData")
   local GameVersion = require("src.core.GameVersion")
 
+  -- default-off <id>: that mod off in every game, as a new default applied once to settings written before it
+  -- (the launcher keeps a note that it's done, so the player's own choice afterwards stands).
+  if verb == "default-off" and version ~= "" then
+    local options = SaveData.loadOptions()
+    for _, v in ipairs(GameVersion.ORDER) do SaveData.setModEnabled(options, version, false, SaveData.modScope(v)) end
+    SaveData.setModEnabled(options, version, false, nil)
+    return SaveData.saveOptions(options) == false and 1 or 0
+  end
+  -- enable-new <id>: a mod the player just installed is on in every game it runs, unless there it clashes with a mod
+  -- that's on (either naming the other, within the range). One line per game: version, then on, or clash and the
+  -- other mod's id and name.
+  if verb == "enable-new" and version ~= "" then
+    local Semver = require("src.mods.Semver")
+    local ModTargets = require("src.mods.ModTargets")
+    local options = SaveData.loadOptions()
+    local all, byId = readManifests(), {}
+    for _, m in ipairs(all) do byId[m.id] = m end
+    local new = byId[version]
+    if not new then io.stderr:write("no such mod\n") return 2 end
+    local function names(a, b)
+      for _, spec in ipairs(a.conflictSpecs or {}) do
+        if spec.id == b.id and (not spec.range or spec.range == "" or Semver.satisfies(b.version, spec.range)) then return true end
+      end
+      return false
+    end
+    for _, v in ipairs(GameVersion.ORDER) do
+      local generation = GameVersion.generation(v)
+      if ModTargets.supports(new, v, generation) then
+        local scope = SaveData.modScope(v)
+        local against
+        for _, m in ipairs(all) do
+          if m.id ~= new.id and ModTargets.supports(m, v, generation) then
+            local saved = SaveData.modEnabled(options, m.id, scope)
+            local on = saved
+            if on == nil then on = not (m.experimental or (m.bundled and type(m.required_assets) == "table" and #m.required_assets > 0)) end
+            if on and (names(new, m) or names(m, new)) then against = m break end
+          end
+        end
+        SaveData.setModEnabled(options, new.id, against == nil, scope)
+        print(v .. "\t" .. (against and ("clash\t" .. clean(against.id) .. "\t" .. clean(against.name)) or "on"))
+      end
+    end
+    return SaveData.saveOptions(options) == false and 1 or 0
+  end
   if verb == "paths" then
     -- The portable folder when there is one (NATIVEMONS_DATA_DIR), else LOVE's.
     local root = SaveData.portableBaseDir() or love.filesystem.getSaveDirectory()
@@ -175,11 +222,69 @@ function ModsCli.run(command)
   if verb == "list" then
     for _, m in ipairs(readManifests()) do
       local saved = SaveData.modEnabled(options, m.id, scope)
-      -- Same default as the loader: on, unless the mod marks itself experimental.
+      -- Same default as the loader: on, unless the mod marks itself experimental or came with the engine and needs an import first.
       local on = saved
-      if on == nil then on = not m.experimental end
+      if on == nil then on = not (m.experimental or (m.bundled and type(m.required_assets) == "table" and #m.required_assets > 0)) end
       print(table.concat({ clean(m.id), clean(m.name), clean(m.version), on and "on" or "off",
         ModTargets.supports(m, version, generation) and "yes" or "no", clean(m.description) }, "\t"))
+    end
+    return 0
+  end
+  -- deps <version>: every dependency of the mods this game runs, by the engine's own rules (Manifest specs, its
+  -- version ranges and game targets), one line each: mod id, mod name, required|optional, the dependency's id, its
+  -- range, its GitHub repo when the mod names one, then ok | missing | version (installed, but outside the range),
+  -- and the installed version. The launcher offers to install what's missing.
+  if verb == "deps" then
+    local Semver = require("src.mods.Semver")
+    local all, byId = readManifests(), {}
+    for _, m in ipairs(all) do byId[m.id] = m end
+    for _, m in ipairs(all) do
+      if ModTargets.supports(m, version, generation) then
+        for _, pair in ipairs({ { "required", m.dependencySpecs }, { "optional", m.optionalSpecs } }) do
+          for _, spec in ipairs(pair[2] or {}) do
+            local here = true
+            if type(spec.games) == "table" and #spec.games > 0 then
+              here = false
+              for _, v in ipairs(spec.games) do if v == version then here = true end end
+            end
+            if here then
+              local have = byId[spec.id]
+              local status = "ok"
+              if not have then status = "missing"
+              elseif spec.range and spec.range ~= "" and not Semver.satisfies(have.version, spec.range) then status = "version" end
+              print(table.concat({ clean(m.id), clean(m.name), pair[1], clean(spec.id), clean(spec.range or ""),
+                clean(spec.github or ""), status, clean(have and have.version or "") }, "\t"))
+            end
+          end
+        end
+      end
+    end
+    return 0
+  end
+  -- conflicts <version>: every clash a mod this game runs declares (conflicts / incompatible) against another installed
+  -- mod it also runs, within the declared version range, one line each: the declaring mod's id, name and on|off, the
+  -- other's id, name and on|off, and the range. While both are on, the engine skips the declaring mod
+  -- (Loader:_enforceConflicts), so the launcher says so and lets the player choose.
+  if verb == "conflicts" then
+    local Semver = require("src.mods.Semver")
+    local all, byId = readManifests(), {}
+    for _, m in ipairs(all) do byId[m.id] = m end
+    local function isOn(m)
+      local saved = SaveData.modEnabled(options, m.id, scope)
+      if saved ~= nil then return saved end
+      return not (m.experimental or (m.bundled and type(m.required_assets) == "table" and #m.required_assets > 0))
+    end
+    for _, m in ipairs(all) do
+      if ModTargets.supports(m, version, generation) then
+        for _, spec in ipairs(m.conflictSpecs or {}) do
+          local other = byId[spec.id]
+          if other and other.id ~= m.id and ModTargets.supports(other, version, generation)
+              and (not spec.range or spec.range == "" or Semver.satisfies(other.version, spec.range)) then
+            print(table.concat({ clean(m.id), clean(m.name), isOn(m) and "on" or "off",
+              clean(other.id), clean(other.name), isOn(other) and "on" or "off", clean(spec.range or "") }, "\t"))
+          end
+        end
+      end
     end
     return 0
   end
@@ -187,7 +292,7 @@ function ModsCli.run(command)
     SaveData.setModEnabled(options, id, state == "on", scope)
     return SaveData.saveOptions(options) == false and 1 or 0
   end
-  io.stderr:write("usage: paths | list <version> | set <version> <id> on|off\n")
+  io.stderr:write("usage: paths | list <version> | deps <version> | conflicts <version> | set <version> <id> on|off | default-off <id>\n")
   return 2
 end
 

@@ -2126,6 +2126,23 @@ local function stampAudioOwners(data, name, registry)
   owners[key] = map
 end
 
+-- nativeMons: a mod that comes with the engine and needs packs imported from the
+-- player's own cartridge dump (required_assets, such as the Link to the Past
+-- example) starts off, as an experimental one does: without the import it can't
+-- run, only fail. A mod the player installed follows the usual default (the
+-- user, 2026-11-03), and the launcher switches it on when it doesn't clash.
+local function bundled(mod)
+  local fs = love and love.filesystem
+  if not (mod and mod.path and fs and fs.getRealDirectory and fs.getSource) then return false end
+  local ok, dir = pcall(fs.getRealDirectory, mod.path .. "/manifest.json")
+  return ok and dir ~= nil and dir == fs.getSource()
+end
+local function offUntilChosen(mod)
+  local manifest = mod and mod.manifest
+  return manifest ~= nil and (manifest.experimental == true
+    or (bundled(mod) and type(manifest.required_assets) == "table" and #manifest.required_assets > 0))
+end
+
 function Loader:load(data, opts)
   opts = opts or {}
   local mode = opts.mode or "normal"
@@ -2174,7 +2191,7 @@ function Loader:load(data, opts)
     for id, mod in pairs(self.mods) do
       installed[#installed + 1] = {
         id = id,
-        experimental = mod.manifest and mod.manifest.experimental == true,
+        experimental = offUntilChosen(mod),
       }
     end
     if SaveData.migrateModEnablement(options, installed) and self.fs.write then
@@ -2188,7 +2205,7 @@ function Loader:load(data, opts)
     local scope = self:_enableScope()
     for id, mod in pairs(self.mods) do
       if not self.disabled[id] and SaveData.modEnabled(options, id, scope) == nil
-          and mod.manifest.experimental then
+          and offUntilChosen(mod) then
         self.disabled[id] = true
       end
     end
