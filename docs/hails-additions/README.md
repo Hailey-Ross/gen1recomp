@@ -1,5 +1,7 @@
 # Hails' additions
 
+[![Engine sync](https://github.com/Hailey-Ross/nativeMons/actions/workflows/engine-sync.yml/badge.svg)](https://github.com/Hailey-Ross/nativeMons/releases)
+
 What this fork's `hails-additions` branch changes, for the nativeMons launcher.
 
 ## Launcher removed
