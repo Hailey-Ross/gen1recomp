@@ -5,7 +5,8 @@
 --   NATIVEMONS_CLI="options"                    love .   the settings the launcher shows
 --   NATIVEMONS_CLI="option <key> <value>"       love .
 --   NATIVEMONS_CLI="export <version>"           love .   prints the exported .sav's path
---   NATIVEMONS_CLI="import <version> <file>"    love .
+--   NATIVEMONS_CLI="import <version> <file>"    love .   exit 3 + "footer <size>": a Gen 1 save with extra bytes
+--   NATIVEMONS_CLI="import-trim <version> <file>"  love .   the same, the extra bytes dropped
 --   NATIVEMONS_CLI="list <version>"             love .
 --   NATIVEMONS_CLI="set <version> <id> on|off"  love .
 --
@@ -198,14 +199,19 @@ function ModsCli.run(command)
     print(slot)
     return 0
   end
-  if verb == "export" or verb == "import" then
+  if verb == "export" or verb == "import" or verb == "import-trim" then
     -- Cartridge saves, for moving Pokemon. Importing makes a new active slot, so older slots stay.
+    -- A Gen 1 save with an emulator footer: "import" exits 3 to ask first, "import-trim" drops the footer.
     GameVersion.set(version)
     require("src.import.CacheFs").mountVersion(version)
     local IO = require("src.import.SaveFileIO")
     local ok, res, info
     if verb == "export" then ok, res, info = IO.exportActiveSlot(version)
-    else ok, res, info = IO.importToSlot(command:match("^%S+%s+%S+%s+(.+)$"), version, false) end
+    else ok, res, info = IO.importToSlot(command:match("^%S+%s+%S+%s+(.+)$"), version, verb == "import-trim") end
+    if not ok and info and info.needsConfirm then
+      io.stderr:write("footer " .. tostring(info.size) .. "\n")
+      return 3
+    end
     if not ok then
       io.stderr:write(tostring(res or (info and info.note) or "save conversion failed") .. "\n")
       return 2
